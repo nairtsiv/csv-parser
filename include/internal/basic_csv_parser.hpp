@@ -374,8 +374,9 @@ namespace csv {
         public:
             MmapParser(csv::string_view filename,
                 const CSVFormat& format,
-                const ColNamesPtr& col_names = nullptr
-            ) : IBasicCSVParser(format, col_names) {
+                const ColNamesPtr& col_names = nullptr,
+                size_t offset = 0
+            ) : IBasicCSVParser(format, col_names), mmap_pos(offset) {
                 this->_filename = filename.data();
                 this->source_size = get_file_size(filename);
             };
@@ -383,6 +384,10 @@ namespace csv {
             ~MmapParser() {}
 
             void next(size_t bytes) override;
+
+            size_t get_mmap_pos() const {
+              return mmap_pos;
+            }
 
         private:
             std::string _filename;

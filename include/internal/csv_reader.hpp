@@ -107,7 +107,7 @@ namespace csv {
          *  Constructors for iterating over large files and parsing in-memory sources.
          */
          ///@{
-        CSVReader(csv::string_view filename, CSVFormat format = CSVFormat::guess_csv());
+        CSVReader(csv::string_view filename, CSVFormat format = CSVFormat::guess_csv(), size_t offset = 0);
 
         /** Allows parsing stream sources such as `std::stringstream` or `std::ifstream`
          *
@@ -154,6 +154,7 @@ namespace csv {
         CSVFormat get_format() const;
         std::vector<std::string> get_col_names() const;
         int index_of(csv::string_view col_name) const;
+        size_t get_offset() const;
         ///@}
 
         /** @name CSV Metadata: Attributes */
@@ -168,6 +169,7 @@ namespace csv {
 
         /** Retrieves the number of rows that have been read so far */
         CONSTEXPR size_t n_rows() const noexcept { return this->_n_rows; }
+
 
         /** Whether or not CSV was prefixed with a UTF-8 bom */
         bool utf8_bom() const noexcept { return this->parser->utf8_bom(); }

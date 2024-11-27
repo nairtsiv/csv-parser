@@ -151,7 +151,7 @@ namespace csv {
      *  \snippet tests/test_read_csv.cpp CSVField Example
      *
      */
-	CSV_INLINE CSVReader::CSVReader(csv::string_view filename, CSVFormat format) : _format(format) {
+	CSV_INLINE CSVReader::CSVReader(csv::string_view filename, CSVFormat format, size_t offset) : _format(format) {
         auto head = internals::get_csv_head(filename);
         using Parser = internals::MmapParser;
 
@@ -166,9 +166,17 @@ namespace csv {
         if (!format.col_names.empty())
             this->set_col_names(format.col_names);
 
-        this->parser = std::unique_ptr<Parser>(new Parser(filename, format, this->col_names)); // For C++11
+        this->parser = std::unique_ptr<Parser>(new Parser(filename, format, this->col_names, offset)); // For C++11
         this->initial_read();
     }
+
+    CSV_INLINE size_t CSVReader::get_offset() const {
+      auto mmap_parser = dynamic_cast<internals::MmapParser*>(this->parser.get());
+      if (mmap_parser) {
+        return mmap_parser->get_mmap_pos();
+      }
+      return 0; // or throw an exception if appropriate
+  }
 
     /** Return the format of the original raw CSV */
     CSV_INLINE CSVFormat CSVReader::get_format() const {
