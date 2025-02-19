@@ -8076,8 +8076,8 @@ namespace csv {
     }
 
     CSV_INLINE bool CSVReader::skip_row(size_t n) {
-      size_t skipped_rows{0};
-      while (true) {
+      size_t rows_to_skip = _n_rows + n;
+      while (_n_rows < rows_to_skip) {
         if (this->records->empty()) {
           if (this->records->is_waitable())
             // Reading thread is currently active => wait for it to populate records
@@ -8094,23 +8094,18 @@ namespace csv {
           }
         }
         else {
-          if (skipped_rows == n) {
-            return true;
-          }
           this->records->pop_front();
           this->_n_rows++;
-          skipped_rows++;
         }
       }
 
-      return false;
+      return true;
   }
 
 CSV_INLINE bool CSVReader::fetch_row(CSVRow &row, size_t n) {
   if (n >= _n_rows) {
     if (skip_row(n - _n_rows)){
-      row = this->records->pop_front();
-      return true;
+      return read_row(row);
     }
   }
   return false;
