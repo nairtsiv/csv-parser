@@ -6357,6 +6357,8 @@ namespace csv {
         /** @name Retrieving CSV Rows */
         ///@{
         bool read_row(CSVRow &row);
+        bool skip_row(size_t n);
+        bool fetch_row(CSVRow &row, size_t n);
         iterator begin();
         HEDLEY_CONST iterator end() const noexcept;
 
@@ -6949,6 +6951,7 @@ namespace csv {
 
 #include <sstream>
 #include <vector>
+#include <iostream>
 
 
 namespace csv {
@@ -7010,9 +7013,15 @@ namespace csv {
      *  @include programs/csv_info.cpp
      */
     CSV_INLINE CSVFileInfo get_file_info(const std::string& filename) {
-        CSVReader reader(filename);
-        CSVFormat format = reader.get_format();
-        for (auto it = reader.begin(); it != reader.end(); ++it);
+      CSVFormat format;
+
+        // Case 3: Throwing an error if variable-length rows are encountered
+        format.variable_columns(VariableColumnPolicy::THROW);
+        format.delimiter(',');
+        format.no_header();
+        CSVReader reader(filename, format, 0);
+        for (auto it = reader.begin(); it != reader.end(); ++it) {
+        }
 
         CSVFileInfo info = {
             filename,
@@ -8065,8 +8074,79 @@ namespace csv {
 
         return false;
     }
+
+    CSV_INLINE bool CSVReader::skip_row(size_t n) {
+      size_t skipped_rows{0};
+      while (true) {
+        if (this->records->empty()) {
+          if (this->records->is_waitable())
+            // Reading thread is currently active => wait for it to populate records
+            this->records->wait();
+          else if (this->parser->eof())
+            // End of file and no more records
+            return false;
+          else {
+            // Reading thread is not active => start another one
+            if (this->read_csv_worker.joinable())
+              this->read_csv_worker.join();
+
+            this->read_csv_worker = std::thread(&CSVReader::read_csv, this, internals::ITERATION_CHUNK_SIZE);
+          }
+        }
+        else {
+          if (skipped_rows == n) {
+            return true;
+          }
+          this->records->pop_front();
+          this->_n_rows++;
+          skipped_rows++;
+        }
+      }
+
+      return false;
+  }
+
+CSV_INLINE bool CSVReader::fetch_row(CSVRow &row, size_t n) {
+  while (true) {
+    if (this->records->empty()) {
+      if (this->records->is_waitable())
+        // Reading thread is currently active => wait for it to populate records
+        this->records->wait();
+      else if (this->parser->eof())
+        // End of file and no more records
+        return false;
+      else {
+        // Reading thread is not active => start another one
+        if (this->read_csv_worker.joinable())
+          this->read_csv_worker.join();
+
+        this->read_csv_worker = std::thread(&CSVReader::read_csv, this, internals::ITERATION_CHUNK_SIZE);
+      }
+    }
+    else if (this->records->front().size() != this->n_cols &&
+        this->_format.variable_column_policy != VariableColumnPolicy::KEEP) {
+      auto errored_row = this->records->pop_front();
+
+      if (this->_format.variable_column_policy == VariableColumnPolicy::THROW) {
+        if (errored_row.size() < this->n_cols)
+          throw std::runtime_error("Line too short " + internals::format_row(errored_row));
+
+        throw std::runtime_error("Line too long " + internals::format_row(errored_row));
+      }
+    }
+    else {
+      this->_n_rows++;
+      if (this->_n_rows - 1 == n) {
+        row = this->records->pop_front();
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
+}
 /** @file
  *  Implements JSON serialization abilities
  */

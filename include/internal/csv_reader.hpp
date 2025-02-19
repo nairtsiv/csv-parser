@@ -142,6 +142,8 @@ namespace csv {
         /** @name Retrieving CSV Rows */
         ///@{
         bool read_row(CSVRow &row);
+        bool skip_row(size_t n);
+        bool fetch_row(CSVRow &row, size_t n);
         iterator begin();
         HEDLEY_CONST iterator end() const noexcept;
 

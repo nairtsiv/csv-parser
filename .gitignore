@@ -4,6 +4,7 @@ CMakeLists2.txt
 # Build
 bin/
 build/
+cmake-build-debug/
 
 # Build: Python
 *.pyc
