@@ -8107,42 +8107,12 @@ namespace csv {
   }
 
 CSV_INLINE bool CSVReader::fetch_row(CSVRow &row, size_t n) {
-  while (true) {
-    if (this->records->empty()) {
-      if (this->records->is_waitable())
-        // Reading thread is currently active => wait for it to populate records
-        this->records->wait();
-      else if (this->parser->eof())
-        // End of file and no more records
-        return false;
-      else {
-        // Reading thread is not active => start another one
-        if (this->read_csv_worker.joinable())
-          this->read_csv_worker.join();
-
-        this->read_csv_worker = std::thread(&CSVReader::read_csv, this, internals::ITERATION_CHUNK_SIZE);
-      }
-    }
-    else if (this->records->front().size() != this->n_cols &&
-        this->_format.variable_column_policy != VariableColumnPolicy::KEEP) {
-      auto errored_row = this->records->pop_front();
-
-      if (this->_format.variable_column_policy == VariableColumnPolicy::THROW) {
-        if (errored_row.size() < this->n_cols)
-          throw std::runtime_error("Line too short " + internals::format_row(errored_row));
-
-        throw std::runtime_error("Line too long " + internals::format_row(errored_row));
-      }
-    }
-    else {
-      this->_n_rows++;
-      if (this->_n_rows - 1 == n) {
-        row = this->records->pop_front();
-        return true;
-      }
+  if (n >= _n_rows) {
+    if (skip_row(n - _n_rows)){
+      row = this->records->pop_front();
+      return true;
     }
   }
-
   return false;
 }
 
